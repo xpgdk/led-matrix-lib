@@ -60,6 +60,7 @@ public:
 	virtual void clear() = 0;
 	virtual uint16_t* operator [](int index) = 0;
 	virtual void fillRow(uint16_t row, LedMatrixColor &color) = 0;
+	virtual void init() = 0;
 };
 
 template <unsigned int R, unsigned int C>
@@ -69,6 +70,9 @@ public:
 	LedMatrixFrameBuffer() {
 		currentRow = 0;
 		currentIntensity = 0;
+	}
+
+	void init() {
 		rowReset();
 	}
 
@@ -99,7 +103,7 @@ public:
 			shiftOut(dots+r*8, 8, currentIntensity);
 		}
 
-		//FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, ROW_ENABLE_PIN);
+		FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, ROW_ENABLE_PIN);
 		if( currentRow == 0 ) {
 			rowFirstTick();
 		} else {
@@ -108,7 +112,7 @@ public:
 
 		rowLatch();
 		colLatch();
-		//FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, 0);
+		FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, 0);
 
 		currentRow++;
 		if( currentRow >= R ) {
@@ -252,6 +256,10 @@ public:
 		return restarted;
 	}
 
+	void setMessage(char *msg) {
+		setMessage(msg, strlen(msg));
+	}
+
 	void setMessage(char *msg, uint16_t len) {
 		strncpy(msgBuffer, msg, len);
 		msgLen = len;
@@ -299,7 +307,7 @@ class LedMatrix
 {
 public:
 	LedMatrix(AbstractLedMatrixFrameBuffer &fb, LedMatrixFont &font) 
-		: defaultFont(font), frameBuffer(fb), animation(NULL)
+		: defaultFont(font), frameBuffer(fb), animation((LedMatrixAnimation*)NULL)
 	{
 	}
 
@@ -311,6 +319,7 @@ public:
 		LedMatrixColor blank(0,0,0);
 		clear(blank);
 	}
+
 	void clear(LedMatrixColor &color) {
 		frameBuffer.clear(color);
 	}
@@ -351,6 +360,10 @@ public:
 	}
 
 	uint8_t getAnimationInterval();
+
+	AbstractLedMatrixFrameBuffer &getFrameBuffer() {
+		return frameBuffer;
+	}
 
 private:
 	LedMatrixFont 			&defaultFont;

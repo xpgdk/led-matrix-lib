@@ -39,15 +39,15 @@ public:
 			break;
 			case FILL:
 				fb[fillY][fillX] = yellow.getValue();
-				fillX++;
-				if( fillX >= fb.getColCount() ) {
-					fillX = 0;
-					fillY++;
-				}
+				fillY++;
 				if( fillY >= fb.getRowCount() ) {
 					fillY = 0;
+					fillX++;
+				}
+				if( fillX >= fb.getColCount() ) {
+					fillX = 0;
 					mode = SCAN;
-					matrix.setAnimationInterval(4);
+					matrix.setAnimationInterval(2);
 				}
 			break;
 			case SCAN:
