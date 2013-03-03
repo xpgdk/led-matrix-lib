@@ -93,6 +93,22 @@ public:
 	}
 
 	bool tick() {
+		//FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, ROW_ENABLE_PIN);
+
+		if( currentIntensity > (32-1) ) {
+			currentIntensity = 0;
+			currentRow++;
+			if( currentRow >= R ) {
+				currentRow = 0;
+				rowFirstTick();
+			} else {
+				rowTick();
+			}
+			rowLatch();
+		} else {
+			currentIntensity++;
+		}
+
 		const uint16_t *dots = fb[currentRow];
 
 		for(uint16_t r=0; r<C/8; r++) {
@@ -103,8 +119,10 @@ public:
 			shiftOut(dots+r*8, 8, currentIntensity);
 		}
 
-		FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, ROW_ENABLE_PIN);
-		if( currentRow == 0 ) {
+
+		colLatch();
+
+		/*if( currentRow == 0 ) {
 			rowFirstTick();
 		} else {
 			rowTick();
@@ -112,18 +130,18 @@ public:
 
 		rowLatch();
 		colLatch();
-		FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, 0);
 
 		currentRow++;
 		if( currentRow >= R ) {
 			currentIntensity++;
 			currentRow = 0;
 
-			if( currentIntensity > (32-1) ) {
+			if( currentIntensity > (33-1) ) {
 				currentIntensity = 0;
 			}
-		}
-		if( currentRow == 0 && currentIntensity == 0) {
+		}*/
+		//FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, 0);
+		if( currentRow == R-1 && currentIntensity == 31) {
 			return true;
 		} else {
 			return false;
