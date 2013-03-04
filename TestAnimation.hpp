@@ -8,7 +8,7 @@ public:
 	LedMatrixTestAnimation(LedMatrix &matrix, LedMatrixAnimation &anim1)
 		: matrix(matrix), animation1(anim1),
 	 	  mode(CLEAR),
-		  yellow(4, 32,0) {
+		  yellow(15, 32,0) {
 			  matrix.setAnimationInterval(1);
 	}
 
@@ -31,7 +31,7 @@ public:
 			break;
 			case ANIM1:
 				if( animation1.update(fb) ) {
-					matrix.setAnimationInterval(1);
+					matrix.setAnimationInterval(2);
 					mode = FILL;
 					fb.clear();
 					counter = 0;
@@ -39,13 +39,13 @@ public:
 			break;
 			case FILL:
 				fb[fillY][fillX] = yellow.getValue();
-				fillY++;
-				if( fillY >= fb.getRowCount() ) {
-					fillY = 0;
-					fillX++;
-				}
+				fillX++;
 				if( fillX >= fb.getColCount() ) {
 					fillX = 0;
+					fillY++;
+				}
+				if( fillY >= fb.getRowCount() ) {
+					fillY = 0;
 					mode = SCAN;
 					matrix.setAnimationInterval(2);
 				}
