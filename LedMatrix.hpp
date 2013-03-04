@@ -226,10 +226,11 @@ public:
 	}
 
 	void reset() {
-		offset = 0;
 		nextChar = 0;
 		currentColor = LedMatrixColor(0x3F, 0, 0);
 		parseColor();
+		offset = font.getStart(msgBuffer[nextChar]);
+		charEnd = font.getEnd(msgBuffer[nextChar]);
 	}
 
 	bool update(AbstractLedMatrixFrameBuffer &fb) {
@@ -239,19 +240,29 @@ public:
 			for(uint16_t l=0; l<fb.getColCount()-1; l++) {
 				fb[start+i][l] = fb[start+i][l+1];
 			}
-			fb[start+i][fb.getColCount()-1] = ((font.getFontData()[msgBuffer[nextChar]-32][i] >> (7-offset)) & 0x1) * currentColor.getValue();
+			if( nextChar < msgLen ) {
+				fb[start+i][fb.getColCount()-1] = ((font.getFontData()[msgBuffer[nextChar]-32][i] >> (7-offset)) & 0x1) * currentColor.getValue();
+			} else {
+				fb[start+i][fb.getColCount()-1] = 0;
+			}
 		}
 		offset++;
-		if( offset >= font.getEnd(msgBuffer[nextChar]) ) {
+		if( offset >= charEnd ) {
 			nextChar++;
 			parseColor();
 
-			if( nextChar >= msgLen ) {
-				nextChar = 0;
-				restarted = true;
-				parseColor();
+			if( nextChar == msgLen ) {
+				offset = 0;
+				charEnd = fb.getColCount() / 2;
+			} else {
+				if( nextChar > msgLen ) {
+					nextChar = 0;
+					restarted = true;
+					parseColor();
+				}
+				offset = font.getStart(msgBuffer[nextChar]);
+				charEnd = font.getEnd(msgBuffer[nextChar]);
 			}
-			offset = font.getStart(msgBuffer[nextChar]);
 		}
 		return restarted;
 	}
@@ -297,6 +308,7 @@ private:
 	uint16_t 		msgLen;
 	uint16_t		nextChar;
 	uint16_t		offset;
+	uint16_t		charEnd;
 	LedMatrixColor		currentColor;
 	LedMatrixFont		&font;
 };
