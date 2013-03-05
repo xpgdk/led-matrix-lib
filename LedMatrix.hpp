@@ -54,6 +54,7 @@ class AbstractLedMatrixFrameBuffer
 public:
 	virtual uint16_t getRowCount() = 0;
 	virtual uint16_t getColCount() = 0;
+	virtual uint16_t getLevels() = 0;
 	virtual void setChar(char c, LedMatrixColor &color, LedMatrixFont &font) = 0;
 	virtual bool tick() = 0;
 	virtual void clear(LedMatrixColor &color) = 0;
@@ -85,6 +86,10 @@ public:
 		return C;
 	}
 
+	uint16_t getLevels() {
+		return LEVELS;
+	}
+
 	void setChar(char c, LedMatrixColor &color, LedMatrixFont &font) {
 		for(unsigned int i=0; i<R; i++) {
 			for(unsigned int l=0; l<C; l++) {
@@ -94,7 +99,7 @@ public:
 	}
 
 	bool tick() {
-		//FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, ROW_ENABLE_PIN);
+		FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, ROW_ENABLE_PIN);
 
 		if( currentIntensity > (LEVELS-1) ) {
 			currentIntensity = 0;
@@ -112,35 +117,17 @@ public:
 
 		const uint16_t *dots = fb[currentRow];
 
-		for(uint16_t r=0; r<C/8; r++) {
-			shiftOut(dots+r*8, 0, currentIntensity);
+		for(uint8_t disp=0; disp<C/8; disp+=2) {
+			shiftOut(dots+(disp+0)*8, 0, currentIntensity);
+			shiftOut(dots+(disp+1)*8, 0, currentIntensity);
+			shiftOut(dots+(disp+0)*8, 8, currentIntensity);
+			shiftOut(dots+(disp+1)*8, 8, currentIntensity);
 		}
 
-		for(uint16_t r=0; r<C/8; r++) {
-			shiftOut(dots+r*8, 8, currentIntensity);
-		}
 
 		colLatch();
 
-		/*if( currentRow == 0 ) {
-			rowFirstTick();
-		} else {
-			rowTick();
-		}
-
-		rowLatch();
-		colLatch();
-
-		currentRow++;
-		if( currentRow >= R ) {
-			currentIntensity++;
-			currentRow = 0;
-
-			if( currentIntensity > (33-1) ) {
-				currentIntensity = 0;
-			}
-		}*/
-		//FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, 0);
+		FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, 0);
 		if( currentRow == R-1 && currentIntensity == (LEVELS-1)) {
 			return true;
 		} else {

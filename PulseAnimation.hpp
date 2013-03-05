@@ -15,16 +15,16 @@ public:
 		fb.clear(color);
 		red += redInc;
 		green += greenInc;
-		if( red > 32 ) {
+		if( red > fb.getLevels() ) {
 			redInc *= -1;
 		}
-		if( red > 33 ) {
+		if( red > fb.getLevels()+1 ) {
 			red = 0;
 		}
-		if( green > 32 ) {
+		if( green > fb.getLevels() ) {
 			greenInc *= -1;
 		}
-		if( green > 33 ) {
+		if( green > fb.getLevels()+1 ) {
 			green = 0;
 		}
 		return false;
