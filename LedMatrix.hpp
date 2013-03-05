@@ -10,7 +10,7 @@ extern "C" {
 #include "led_matrix_config.h"
 }
 
-template <unsigned R, unsigned C> class LedMatrixFrameBuffer;
+template <unsigned R, unsigned C, unsigned LEVELS> class LedMatrixFrameBuffer;
 class AbstractLedMatrixFrameBuffer;
 
 struct LedMatrixColor
@@ -63,7 +63,7 @@ public:
 	virtual void init() = 0;
 };
 
-template <unsigned int R, unsigned int C>
+template <unsigned int R, unsigned int C, unsigned int LEVELS>
 class LedMatrixFrameBuffer : public AbstractLedMatrixFrameBuffer
 {
 public:
@@ -95,7 +95,7 @@ public:
 	bool tick() {
 		//FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, ROW_ENABLE_PIN);
 
-		if( currentIntensity > (32-1) ) {
+		if( currentIntensity > (LEVELS-1) ) {
 			currentIntensity = 0;
 			currentRow++;
 			if( currentRow >= R ) {
@@ -141,7 +141,7 @@ public:
 			}
 		}*/
 		//FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, 0);
-		if( currentRow == R-1 && currentIntensity == 31) {
+		if( currentRow == R-1 && currentIntensity == (LEVELS-1)) {
 			return true;
 		} else {
 			return false;
