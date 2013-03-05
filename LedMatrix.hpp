@@ -61,6 +61,7 @@ public:
 	virtual uint16_t* operator [](int index) = 0;
 	virtual void fillRow(uint16_t row, LedMatrixColor &color) = 0;
 	virtual void init() = 0;
+	virtual void putPixel(uint16_t x, uint16_t y, LedMatrixColor &color) = 0;
 };
 
 template <unsigned int R, unsigned int C, unsigned int LEVELS>
@@ -119,7 +120,6 @@ public:
 			shiftOut(dots+r*8, 8, currentIntensity);
 		}
 
-
 		colLatch();
 
 		/*if( currentRow == 0 ) {
@@ -171,12 +171,16 @@ public:
 		return (uint16_t*)fb[index];
 	}
 
+	inline void putPixel(uint16_t x, uint16_t y, LedMatrixColor &color) {
+		fb[y][x] = color.getValue();
+	}
+
+
 private:
-	inline void shiftOut(const uint16_t b[8], uint8_t shift, uint8_t threshold) {
+	void shiftOut(const uint16_t b[8], uint8_t shift, uint8_t threshold) {
 		uint16_t mask = 0xFF << shift;
 		uint16_t mt = threshold << shift;
 		for(unsigned int i=0;i<8; i++) {
-			//if( ((b[8-1-i] >> shift) & 0xFF) > threshold) {
 			if( (b[8-1-i] & mask) > mt) {
 				FAST_GPIOPinWrite(SER_OUT_PORT, SER_OUT_PIN, SER_OUT_PIN);
 			} else {
@@ -352,6 +356,14 @@ public:
 
 	void clear(LedMatrixColor &color) {
 		frameBuffer.clear(color);
+	}
+
+	inline void fillRect(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, LedMatrixColor &color) {
+		for(uint16_t x = x1; x <= x2; x++) {
+			for(uint16_t y = y1; y <= y2; y++) {
+				frameBuffer.putPixel(x, y, color);
+			}
+		}
 	}
 
 	bool update() {
