@@ -66,6 +66,7 @@ public:
 	virtual void putPixel(uint16_t x, uint16_t y, LedMatrixColor &color) = 0;
 	virtual void putPixel(uint16_t x, uint16_t y, uint16_t color) = 0;
 	virtual uint16_t getPixel(uint16_t x, uint16_t y) = 0;
+	virtual void reset() = 0;
 };
 
 template <unsigned int R, unsigned int C, unsigned int LEVELS>
@@ -79,6 +80,11 @@ public:
 
 	void init() {
 		rowReset();
+	}
+
+	void reset() {
+		currentRow = 0;
+		currentIntensity = 0;
 	}
 
 	uint16_t getRowCount() {
@@ -339,12 +345,12 @@ class LedMatrix
 {
 public:
 	LedMatrix(AbstractLedMatrixFrameBuffer &fb, LedMatrixFont &font) 
-		: defaultFont(font), frameBuffer(fb), animation((LedMatrixAnimation*)NULL)
+		: defaultFont(font), frameBuffer(&fb), animation((LedMatrixAnimation*)NULL)
 	{
 	}
 
 	inline void setChar(char c, LedMatrixColor &color) {
-		frameBuffer.setChar(c, color, defaultFont);
+		frameBuffer->setChar(c, color, defaultFont);
 	}
 
 	void clear() {
@@ -353,19 +359,23 @@ public:
 	}
 
 	void clear(LedMatrixColor &color) {
-		frameBuffer.clear(color);
+		frameBuffer->clear(color);
 	}
 
 	inline void fillRect(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, LedMatrixColor &color) {
 		for(uint16_t x = x1; x <= x2; x++) {
 			for(uint16_t y = y1; y <= y2; y++) {
-				frameBuffer.putPixel(x, y, color);
+				frameBuffer->putPixel(x, y, color);
 			}
 		}
 	}
 
 	bool update() {
-		bool frameDone = frameBuffer.tick();
+		bool frameDone = frameBuffer->tick();
+		if( frameDone && nextFrameBuffer ) {
+			frameBuffer = nextFrameBuffer;
+			nextFrameBuffer = NULL;
+		}
 		if( frameDone && animation != NULL ) {
 			animCountdown--;
 			if( animCountdown == 0 ) {
@@ -378,7 +388,7 @@ public:
 
 	void animTick() {
 		if( animation != NULL ) {
-			animation->update(frameBuffer);
+			animation->update(*frameBuffer);
 		}
 	}
 
@@ -402,21 +412,21 @@ public:
 	uint8_t getAnimationInterval();
 
 	AbstractLedMatrixFrameBuffer &getFrameBuffer() {
-		return frameBuffer;
+		return *frameBuffer;
 	}
 
-        void clearAnimation() {
-          animation = NULL;
-        }
+	void clearAnimation() {
+		animation = NULL;
+	}
 
-	void changeFrameBuffer(AbstractLedMatrixFrameBuffer &fb) {
-		printf("Changing framebuffer\r\n");
-		frameBuffer = fb;
+	void changeFrameBuffer(AbstractLedMatrixFrameBuffer *fb) {
+		nextFrameBuffer = fb;
 	}
 
 private:
 	LedMatrixFont 			&defaultFont;
-	AbstractLedMatrixFrameBuffer	&frameBuffer; 
+	AbstractLedMatrixFrameBuffer	*frameBuffer; 
+	AbstractLedMatrixFrameBuffer	*nextFrameBuffer; 
 	LedMatrixAnimation		*animation;
 	uint8_t				animInterval;
 	uint8_t				animCountdown;
