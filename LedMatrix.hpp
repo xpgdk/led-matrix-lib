@@ -394,6 +394,10 @@ public:
 		return frameBuffer;
 	}
 
+        void clearAnimation() {
+          animation = NULL;
+        }
+
 private:
 	LedMatrixFont 			&defaultFont;
 	AbstractLedMatrixFrameBuffer	&frameBuffer; 
