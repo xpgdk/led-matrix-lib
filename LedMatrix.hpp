@@ -8,6 +8,7 @@
 
 extern "C" {
 #include "led_matrix_config.h"
+#include "uart.h"
 }
 
 template <unsigned R, unsigned C, unsigned LEVELS> class LedMatrixFrameBuffer;
@@ -59,10 +60,12 @@ public:
 	virtual bool tick() = 0;
 	virtual void clear(LedMatrixColor &color) = 0;
 	virtual void clear() = 0;
-	virtual uint16_t* operator [](int index) = 0;
+	/*virtual uint16_t* operator [](int index) = 0;*/
 	virtual void fillRow(uint16_t row, LedMatrixColor &color) = 0;
 	virtual void init() = 0;
 	virtual void putPixel(uint16_t x, uint16_t y, LedMatrixColor &color) = 0;
+	virtual void putPixel(uint16_t x, uint16_t y, uint16_t color) = 0;
+	virtual uint16_t getPixel(uint16_t x, uint16_t y) = 0;
 };
 
 template <unsigned int R, unsigned int C, unsigned int LEVELS>
@@ -154,12 +157,16 @@ public:
 		}
 	}
 
-	uint16_t* operator [](int index) {
-		return (uint16_t*)fb[index];
-	}
-
 	inline void putPixel(uint16_t x, uint16_t y, LedMatrixColor &color) {
 		fb[y][x] = color.getValue();
+	}
+
+	inline void putPixel(uint16_t x, uint16_t y, uint16_t color) {
+		fb[y][x] = color;
+	}
+
+	inline uint16_t getPixel(uint16_t x, uint16_t y) {
+		return fb[y][x];
 	}
 
 
@@ -220,6 +227,7 @@ public:
 	uint16_t	fb[R][C]; // Holds actual framebuffer data
 };
 
+
 class LedMatrixAnimation
 {
 public:
@@ -247,12 +255,14 @@ public:
 		uint16_t start = fb.getRowCount()/2-4;
 		for(uint16_t i=0; i<8; i++) {
 			for(uint16_t l=0; l<fb.getColCount()-1; l++) {
-				fb[start+i][l] = fb[start+i][l+1];
+				fb.putPixel(l, start+i, fb.getPixel(l+1, start+i));
 			}
 			if( nextChar < msgLen ) {
-				fb[start+i][fb.getColCount()-1] = ((font.getFontData()[msgBuffer[nextChar]-32][i] >> (7-offset)) & 0x1) * currentColor.getValue();
+				fb.putPixel(fb.getColCount()-1, start+i, ((font.getFontData()[msgBuffer[nextChar]-32][i] >> (7-offset)) & 0x1) * currentColor.getValue());
+				//fb[start+i][fb.getColCount()-1] = ((font.getFontData()[msgBuffer[nextChar]-32][i] >> (7-offset)) & 0x1) * currentColor.getValue();
 			} else {
-				fb[start+i][fb.getColCount()-1] = 0;
+				fb.putPixel(fb.getColCount()-1, start+i, 0);
+				//fb[start+i][fb.getColCount()-1] = 0;
 			}
 		}
 		offset++;
@@ -290,6 +300,7 @@ public:
 		strncpy(msgBuffer+msgLen, msg, len);
 		msgLen += len;
 	}
+
 
 private:
 	void parseColor() {
@@ -397,6 +408,11 @@ public:
         void clearAnimation() {
           animation = NULL;
         }
+
+	void changeFrameBuffer(AbstractLedMatrixFrameBuffer &fb) {
+		printf("Changing framebuffer\r\n");
+		frameBuffer = fb;
+	}
 
 private:
 	LedMatrixFont 			&defaultFont;

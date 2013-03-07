@@ -38,7 +38,7 @@ public:
 				}
 			break;
 			case FILL:
-				fb[fillY][fillX] = yellow.getValue();
+				fb.putPixel(fillX,fillY, yellow);
 				fillX++;
 				if( fillX >= fb.getColCount() ) {
 					fillX = 0;
