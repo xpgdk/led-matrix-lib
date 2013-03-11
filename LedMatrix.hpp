@@ -11,7 +11,12 @@ extern "C" {
 #include "uart.h"
 }
 
-template <unsigned R, unsigned C, unsigned LEVELS> class LedMatrixFrameBuffer;
+#include <mcu++/gpio.hpp>
+
+#define NEW_GPIO
+
+//template <unsigned R, unsigned C, unsigned LEVELS> class LedMatrixFrameBuffer;
+template <typename CONFIG> class LedMatrixFrameBuffer;
 class AbstractLedMatrixFrameBuffer;
 
 struct LedMatrixColor
@@ -69,16 +74,29 @@ public:
 	virtual void reset() = 0;
 };
 
-template <unsigned int R, unsigned int C, unsigned int LEVELS>
+//template <unsigned int R, unsigned int C, unsigned int LEVELS>
+template <typename CONFIG>
 class LedMatrixFrameBuffer : public AbstractLedMatrixFrameBuffer
 {
 public:
+	static const uint16_t R = CONFIG::Rows;
+	static const uint16_t C = CONFIG::Cols;
+	static const uint16_t LEVELS = CONFIG::Levels;
 	LedMatrixFrameBuffer() {
 		currentRow = 0;
 		currentIntensity = 0;
 	}
 
 	void init() {
+		CONFIG::GPIOColOutput::ConfigureDirection(MCU::GPIO::Output);
+		CONFIG::GPIOColLatch::ConfigureDirection(MCU::GPIO::Output);
+		CONFIG::GPIOColClock::ConfigureDirection(MCU::GPIO::Output);
+
+		CONFIG::GPIORowLatch::ConfigureDirection(MCU::GPIO::Output);
+		CONFIG::GPIORowClock::ConfigureDirection(MCU::GPIO::Output);
+		CONFIG::GPIORowOutput::ConfigureDirection(MCU::GPIO::Output);
+		CONFIG::GPIORowEnable::ConfigureDirection(MCU::GPIO::Output);
+
 		rowReset();
 	}
 
@@ -108,7 +126,7 @@ public:
 	}
 
 	bool tick() {
-		FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, ROW_ENABLE_PIN);
+		CONFIG::GPIORowEnable::Write(1);
 
 		if( currentIntensity > (LEVELS-1) ) {
 			currentIntensity = 0;
@@ -136,7 +154,7 @@ public:
 
 		colLatch();
 
-		FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, 0);
+		CONFIG::GPIORowEnable::Write(0);
 		if( currentRow == R-1 && currentIntensity == (LEVELS-1)) {
 			return true;
 		} else {
@@ -181,6 +199,15 @@ private:
 		uint16_t mask = 0xFF << shift;
 		uint16_t mt = threshold << shift;
 		for(unsigned int i=0;i<8; i++) {
+#ifdef NEW_GPIO
+			if( (b[8-1-i] & mask) > mt) {
+				CONFIG::GPIOColOutput::Write(1);
+			} else {
+				CONFIG::GPIOColOutput::Write(0);
+			}
+			CONFIG::GPIOColClock::Write(1);
+			CONFIG::GPIOColClock::Write(0);
+#else
 			if( (b[8-1-i] & mask) > mt) {
 				FAST_GPIOPinWrite(SER_OUT_PORT, SER_OUT_PIN, SER_OUT_PIN);
 			} else {
@@ -188,41 +215,69 @@ private:
 			}
 			FAST_GPIOPinWrite(CLK_OUT_PORT, CLK_OUT_PIN, CLK_OUT_PIN);
 			FAST_GPIOPinWrite(CLK_OUT_PORT, CLK_OUT_PIN, 0);
+#endif
 		}
 	}
 
 	void rowReset(void) {
 		for(unsigned int i=0; i<R; i++) {
+#ifdef NEW_GPIO
+			CONFIG::GPIORowOutput::Write(1);
+			CONFIG::GPIORowClock::Write(1);
+			CONFIG::GPIORowClock::Write(0);
+#else
 			FAST_GPIOPinWrite(ROW_SER_OUT_PORT, ROW_SER_OUT_PIN, ROW_SER_OUT_PIN);
 
 			FAST_GPIOPinWrite(ROW_CLK_OUT_PORT, ROW_CLK_OUT_PIN, ROW_CLK_OUT_PIN);
 			FAST_GPIOPinWrite(ROW_CLK_OUT_PORT, ROW_CLK_OUT_PIN, 0);
+#endif
 		}
 	}
 
 	void rowTick(void) {
+#ifdef NEW_GPIO
+		CONFIG::GPIORowOutput::Write(1);
+		CONFIG::GPIORowClock::Write(1);
+		CONFIG::GPIORowClock::Write(0);
+#else
 		FAST_GPIOPinWrite(ROW_SER_OUT_PORT, ROW_SER_OUT_PIN, ROW_SER_OUT_PIN);
 
 		FAST_GPIOPinWrite(ROW_CLK_OUT_PORT, ROW_CLK_OUT_PIN, ROW_CLK_OUT_PIN);
 		FAST_GPIOPinWrite(ROW_CLK_OUT_PORT, ROW_CLK_OUT_PIN, 0);
+#endif
 	}
 
 	void rowFirstTick(void) {
+#ifdef NEW_GPIO
+		CONFIG::GPIORowOutput::Write(0);
+		CONFIG::GPIORowClock::Write(1);
+		CONFIG::GPIORowClock::Write(0);
+#else
 		FAST_GPIOPinWrite(ROW_SER_OUT_PORT, ROW_SER_OUT_PIN, 0);
-
 		FAST_GPIOPinWrite(ROW_CLK_OUT_PORT, ROW_CLK_OUT_PIN, ROW_CLK_OUT_PIN);
 		FAST_GPIOPinWrite(ROW_CLK_OUT_PORT, ROW_CLK_OUT_PIN, 0);
+#endif
 	}
 
 	void rowLatch(void)
 	{
+#ifdef NEW_GPIO
+		CONFIG::GPIORowLatch::Write(1);
+		CONFIG::GPIORowLatch::Write(0);
+#else
 		FAST_GPIOPinWrite(ROW_LATCH_PORT, ROW_LATCH_PIN, ROW_LATCH_PIN);
 		FAST_GPIOPinWrite(ROW_LATCH_PORT, ROW_LATCH_PIN, 0);
+#endif
 	}
 
 	void colLatch(void) {
+#ifdef NEW_GPIO
+		CONFIG::GPIOColLatch::Write(1);
+		CONFIG::GPIOColLatch::Write(0);
+#else
 		FAST_GPIOPinWrite(LATCH_PORT, LATCH_PIN, LATCH_PIN);
 		FAST_GPIOPinWrite(LATCH_PORT, LATCH_PIN, 0);
+#endif
 	}
 
 private:
@@ -347,6 +402,10 @@ public:
 	LedMatrix(AbstractLedMatrixFrameBuffer &fb, LedMatrixFont &font) 
 		: defaultFont(font), frameBuffer(&fb), animation((LedMatrixAnimation*)NULL)
 	{
+	}
+
+	void init() {
+		frameBuffer->init();
 	}
 
 	inline void setChar(char c, LedMatrixColor &color) {
