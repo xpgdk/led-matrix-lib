@@ -8,7 +8,6 @@
 
 extern "C" {
 #include "led_matrix_config.h"
-#include "uart.h"
 }
 
 #include <mcu++/gpio.hpp>
@@ -433,7 +432,7 @@ public:
 		bool frameDone = frameBuffer->tick();
 		if( frameDone && nextFrameBuffer ) {
 			frameBuffer = nextFrameBuffer;
-			nextFrameBuffer = NULL;
+			nextFrameBuffer = (AbstractLedMatrixFrameBuffer*)NULL;
 		}
 		if( frameDone && animation != NULL ) {
 			animCountdown--;
@@ -475,7 +474,7 @@ public:
 	}
 
 	void clearAnimation() {
-		animation = NULL;
+		animation = (LedMatrixAnimation*)NULL;
 	}
 
 	void changeFrameBuffer(AbstractLedMatrixFrameBuffer *fb) {
