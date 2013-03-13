@@ -24,11 +24,47 @@ public:
 
 		Config::SpiSelect();
 
+		uint16_t startX = 0;
+		uint16_t startY = 0;
+		uint16_t endX = getColCount();
+		uint16_t endY = getRowCount();
+
+		/* Send frame-buffer */
+		Config::SpiSend(0x04);
+		Config::SpiSend((startX >> 8) & 0xFF);
+		Config::SpiSend(startX & 0xFF);
+		Config::SpiSend((startY >> 8) & 0xFF);
+		Config::SpiSend(startY & 0xFF);
+
+		Config::SpiSend((endX >> 8) & 0xFF);
+		Config::SpiSend(endX & 0xFF);
+		Config::SpiSend((endY >> 8) & 0xFF);
+		Config::SpiSend(endY & 0xFF);
+
+		for(uint16_t y=startY; y<endY; y++) {
+		  for(uint16_t x=startX; x<endX; x++) {
+		    uint16_t pixel = getPixel(x, y);
+		    Config::SpiSend((pixel >> 8) & 0xFF);
+		    Config::SpiSend(pixel & 0xFF);
+		  }
+		}
+
+
+		Config::SpiSend(0);
+		Config::SpiSend(0);
+		Config::SpiDeSelect();
+
+#if 1
+		Config::SpiSend(0);
+
+		Config::SpiSelect();
+		/* Send flip-command */
 		Config::SpiSend(0x5);
 		Config::SpiSend(0);
 		Config::SpiSend(0);
 
 		Config::SpiDeSelect();
+#endif
 		
 		UARTprintf("End\r\n");
 		// We always update an entire frame at a time
@@ -36,8 +72,8 @@ public:
 	}
 
 	void clear(LedMatrixColor &color) {
-		for(uint16_t y=0; y<getColCount(); y++) {
-			for(uint16_t x=0; x<getRowCount(); x++) {
+		for(uint16_t y=0; y<getRowCount(); y++) {
+			for(uint16_t x=0; x<getColCount(); x++) {
 				putPixel(x, y, color);
 			}
 		}
