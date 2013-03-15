@@ -52,12 +52,12 @@ public:
 
 		Config::SpiSend(0);
 		Config::SpiSend(0);
-		Config::SpiDeSelect();
+                
+		//Config::SpiDeSelect();
+
 
 #if 1
-		Config::SpiSend(0);
-
-		Config::SpiSelect();
+		//Config::SpiSelect();
 		/* Send flip-command */
 		Config::SpiSend(0x5);
 		Config::SpiSend(0);
