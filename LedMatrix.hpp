@@ -32,11 +32,15 @@ public:
 
 	LedMatrixColor(uint8_t red, uint8_t green, uint8_t blue) {
 		NOT_USED(blue);
-		color = (red & 0xFF) | ((green & 0xFF)<<8);
+		color = LedMatrixColor::getValue(red, green, blue);
 	}
 
 	inline uint16_t getValue() {
 		return color;
+	}
+
+	static inline uint16_t getValue(uint8_t red, uint8_t green, uint8_t blue) {
+		return (red & 0xFF) | ((green & 0xFF)<<8);
 	}
 private:
 	uint16_t color;
@@ -103,6 +107,7 @@ public:
 	void reset() {
 		currentRow = 0;
 		currentIntensity = 0;
+		rowReset();
 	}
 
 	uint16_t getRowCount() {
@@ -187,6 +192,11 @@ public:
 
 	inline void putPixel(uint16_t x, uint16_t y, uint16_t color) {
 		fb[y][x] = color;
+	}
+
+	inline void putPixelDirect(uint16_t x, uint16_t y, uint16_t color) {
+		if( x <= C && y <= R ) 
+			fb[y][x] = color;
 	}
 
 	inline uint16_t getPixel(uint16_t x, uint16_t y) {
