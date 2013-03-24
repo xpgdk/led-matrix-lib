@@ -44,8 +44,8 @@ public:
 		for(uint16_t y=startY; y<endY; y++) {
 		  for(uint16_t x=startX; x<endX; x++) {
 		    uint16_t pixel = getPixel(x, y);
-		    Config::SpiSend((pixel >> 8) & 0xFF);
 		    Config::SpiSend(pixel & 0xFF);
+		    Config::SpiSend((pixel >> 8) & 0xFF);
 		  }
 		}
 
