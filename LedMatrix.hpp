@@ -16,7 +16,6 @@ extern "C" {
 
 //template <unsigned R, unsigned C, unsigned LEVELS> class LedMatrixFrameBuffer;
 template <typename CONFIG> class LedMatrixFrameBuffer;
-class AbstractLedMatrixFrameBuffer;
 
 struct LedMatrixColor
 {
@@ -58,28 +57,10 @@ public:
 	int			getEnd(char c);
 };
 
-class AbstractLedMatrixFrameBuffer
-{
-public:
-	virtual uint16_t getRowCount() = 0;
-	virtual uint16_t getColCount() = 0;
-	virtual uint16_t getLevels() = 0;
-	virtual void setChar(char c, LedMatrixColor &color, LedMatrixFont &font) = 0;
-	virtual bool tick() = 0;
-	virtual void clear(LedMatrixColor &color) = 0;
-	virtual void clear() = 0;
-	/*virtual uint16_t* operator [](int index) = 0;*/
-	virtual void fillRow(uint16_t row, LedMatrixColor &color) = 0;
-	virtual void init() = 0;
-	virtual void putPixel(uint16_t x, uint16_t y, LedMatrixColor &color) = 0;
-	virtual void putPixel(uint16_t x, uint16_t y, uint16_t color) = 0;
-	virtual uint16_t getPixel(uint16_t x, uint16_t y) = 0;
-	virtual void reset() = 0;
-};
 
 //template <unsigned int R, unsigned int C, unsigned int LEVELS>
 template <typename CONFIG>
-class LedMatrixFrameBuffer : public AbstractLedMatrixFrameBuffer
+class LedMatrixFrameBuffer
 {
 public:
 	static const uint16_t R = CONFIG::Rows;
@@ -109,15 +90,15 @@ public:
 		rowReset();
 	}
 
-	uint16_t getRowCount() {
+	static inline const uint16_t getRowCount() {
 		return R;
 	}
 
-	uint16_t getColCount() {
+	static inline const uint16_t getColCount() {
 		return C;
 	}
 
-	uint16_t getLevels() {
+	inline const uint16_t getLevels() const {
 		return LEVELS;
 	}
 
@@ -299,14 +280,16 @@ public:
 };
 
 
+template<class FbType>
 class LedMatrixAnimation
 {
 public:
 	virtual void reset() = 0;
-	virtual bool update(AbstractLedMatrixFrameBuffer &fb) = 0;
+	virtual bool update(FbType &fb) = 0;
 };
 
-class LedMatrixScrollAnimation : public LedMatrixAnimation
+template<class FbType>
+class LedMatrixScrollAnimation : public LedMatrixAnimation<FbType>
 {
 public:
 	LedMatrixScrollAnimation(LedMatrixFont &font) 
@@ -321,7 +304,7 @@ public:
 		charEnd = font.getEnd(msgBuffer[nextChar]);
 	}
 
-	bool update(AbstractLedMatrixFrameBuffer &fb) {
+	bool update(FbType &fb) {
 		bool restarted = false;
 		uint16_t start = fb.getRowCount()/2-4;
 		for(uint16_t i=0; i<8; i++) {
@@ -406,11 +389,12 @@ private:
 
 
 
+template<class FbType>
 class LedMatrix
 {
 public:
-	LedMatrix(AbstractLedMatrixFrameBuffer &fb, LedMatrixFont &font) 
-		: defaultFont(font), frameBuffer(&fb), animation((LedMatrixAnimation*)NULL)
+	LedMatrix(FbType &fb, LedMatrixFont &font) 
+		: defaultFont(font), frameBuffer(&fb), animation((LedMatrixAnimation<FbType>*)NULL)
 	{
 	}
 
@@ -443,7 +427,7 @@ public:
 		bool frameDone = frameBuffer->tick();
 		if( frameDone && nextFrameBuffer ) {
 			frameBuffer = nextFrameBuffer;
-			nextFrameBuffer = (AbstractLedMatrixFrameBuffer*)NULL;
+			nextFrameBuffer = (FbType*)NULL;
 		}
 		if( frameDone && animation != NULL ) {
 			animCountdown--;
@@ -461,7 +445,7 @@ public:
 		}
 	}
 
-	void setAnimation(LedMatrixAnimation *animation, uint8_t interval) {
+	void setAnimation(LedMatrixAnimation<FbType> *animation, uint8_t interval) {
 		animInterval = interval;
 		if( animInterval == 0 ) {
 			animInterval = 1;
@@ -480,23 +464,23 @@ public:
 
 	uint8_t getAnimationInterval();
 
-	AbstractLedMatrixFrameBuffer &getFrameBuffer() {
+	FbType &getFrameBuffer() {
 		return *frameBuffer;
 	}
 
 	void clearAnimation() {
-		animation = (LedMatrixAnimation*)NULL;
+		animation = (LedMatrixAnimation<FbType>*)NULL;
 	}
 
-	void changeFrameBuffer(AbstractLedMatrixFrameBuffer *fb) {
+	void changeFrameBuffer(FbType *fb) {
 		nextFrameBuffer = fb;
 	}
 
 private:
 	LedMatrixFont 			&defaultFont;
-	AbstractLedMatrixFrameBuffer	*frameBuffer; 
-	AbstractLedMatrixFrameBuffer	*nextFrameBuffer; 
-	LedMatrixAnimation		*animation;
+	FbType	*frameBuffer; 
+	FbType	*nextFrameBuffer; 
+	LedMatrixAnimation<FbType>		*animation;
 	uint8_t				animInterval;
 	uint8_t				animCountdown;
 
