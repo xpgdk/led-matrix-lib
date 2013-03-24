@@ -194,8 +194,9 @@ public:
 	}
 
 	inline void putPixelDirect(uint16_t x, uint16_t y, uint16_t color) {
-		if( x <= C && y <= R ) 
+		if( x < C && y < R ) {
 			fb[y][x] = color;
+		}
 	}
 
 	inline uint16_t getPixel(uint16_t x, uint16_t y) {
