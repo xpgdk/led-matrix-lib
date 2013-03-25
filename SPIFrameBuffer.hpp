@@ -10,7 +10,7 @@ class SPIFrameBufferConfigConcept {
 };
 
 template<typename Config>
-class SPIFrameBuffer: public AbstractLedMatrixFrameBuffer
+class SPIFrameBuffer
 {
 public:
 	inline uint16_t getRowCount() {return Config::Rows;}
