@@ -20,7 +20,6 @@ public:
 	void setChar(char c, LedMatrixColor &color, LedMatrixFont &font) {}
 
 	bool tick() {
-		UARTprintf("Start\r\n");
 
 		Config::SpiSelect();
 
@@ -66,12 +65,14 @@ public:
 		Config::SpiDeSelect();
 #endif
 		
-		UARTprintf("End\r\n");
 		// We always update an entire frame at a time
 		return true;
 	}
 
 	void clear(LedMatrixColor &color) {
+		clear(color.getValue());
+	}
+	void clear(uint16_t color) {
 		for(uint16_t y=0; y<getRowCount(); y++) {
 			for(uint16_t x=0; x<getColCount(); x++) {
 				putPixel(x, y, color);
@@ -99,7 +100,9 @@ public:
 	}
 
 	void putPixel(uint16_t x, uint16_t y, uint16_t color) {
-		data[x][y] = color;
+		if( x < Config::Cols && y < Config::Rows ) {
+			data[x][y] = color;
+		}
 	}
 
 	uint16_t getPixel(uint16_t x, uint16_t y) {
