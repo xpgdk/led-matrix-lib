@@ -10,8 +10,8 @@ extern "C" {
 #include "led_matrix_config.h"
 }
 
-template <unsigned R, unsigned C, unsigned LEVELS> class LedMatrixFrameBuffer;
-class AbstractLedMatrixFrameBuffer;
+//template <unsigned R, unsigned C, unsigned LEVELS> class LedMatrixFrameBuffer;
+template <typename CONFIG> class LedMatrixFrameBuffer;
 
 struct LedMatrixColor
 {
@@ -344,6 +344,23 @@ public:
 	inline void setChar(char c, LedMatrixColor &color) {
 		frameBuffer.setChar(c, color, defaultFont);
 	}
+
+        void putChar(char c, LedMatrixColor &color, unsigned int startX, unsigned int startY) {
+            for(unsigned y = 0; y < defaultFont.getFontHeight(); y++) {
+                for(unsigned x = 0; x < defaultFont.getFontWidth(); x++) {
+                    unsigned int shiftFactor = (8 - 1 - x);
+                    unsigned int p = (((defaultFont.getFontData()[c-32][y]) >> shiftFactor) & 0x1) * color.getValue();
+                    frameBuffer->putPixel(x + startX, y + startY, p);
+                }
+            }
+        }
+
+        void putString(char *str, LedMatrixColor &color, unsigned int startX, unsigned int startY) {
+            for(; *str != '\0'; str++) {
+                putChar(*str, color, startX, startY);
+                startX += defaultFont.getFontWidth();
+            }
+        }
 
 	void clear() {
 		LedMatrixColor blank(0,0,0);
