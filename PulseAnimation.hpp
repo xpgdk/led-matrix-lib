@@ -3,28 +3,29 @@
 
 #include "LedMatrix.hpp"
 
-class PulseAnimation : public LedMatrixAnimation {
+template<class FbType>
+class PulseAnimation : public LedMatrixAnimation<FbType> {
 public:
 	PulseAnimation() 
 		: red(0), green(32),
 		  redInc(1), greenInc(-1) {
 	}
 
-	bool update(AbstractLedMatrixFrameBuffer &fb) {
+	bool update(FbType &fb) {
 		LedMatrixColor color(red, green, 0);
 		fb.clear(color);
 		red += redInc;
 		green += greenInc;
-		if( red > 32 ) {
+		if( red > fb.getLevels() ) {
 			redInc *= -1;
 		}
-		if( red > 33 ) {
+		if( red > fb.getLevels()+1 ) {
 			red = 0;
 		}
-		if( green > 32 ) {
+		if( green > fb.getLevels() ) {
 			greenInc *= -1;
 		}
-		if( green > 33 ) {
+		if( green > fb.getLevels()+1 ) {
 			green = 0;
 		}
 		return false;

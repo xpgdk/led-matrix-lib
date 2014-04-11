@@ -10,6 +10,10 @@ extern "C" {
 #include "led_matrix_config.h"
 }
 
+#include <mcu++/gpio.hpp>
+
+#define NEW_GPIO
+
 //template <unsigned R, unsigned C, unsigned LEVELS> class LedMatrixFrameBuffer;
 template <typename CONFIG> class LedMatrixFrameBuffer;
 
@@ -26,11 +30,15 @@ public:
 
 	LedMatrixColor(uint8_t red, uint8_t green, uint8_t blue) {
 		NOT_USED(blue);
-		color = (red & 0xFF) | ((green & 0xFF)<<8);
+		color = LedMatrixColor::getValue(red, green, blue);
 	}
 
 	inline uint16_t getValue() {
 		return color;
+	}
+
+	static inline uint16_t getValue(uint8_t red, uint8_t green, uint8_t blue) {
+		return (red & 0xFF) | ((green & 0xFF)<<8);
 	}
 private:
 	uint16_t color;
@@ -49,39 +57,49 @@ public:
 	int			getEnd(char c);
 };
 
-class AbstractLedMatrixFrameBuffer
-{
-public:
-	virtual uint16_t getRowCount() = 0;
-	virtual uint16_t getColCount() = 0;
-	virtual void setChar(char c, LedMatrixColor &color, LedMatrixFont &font) = 0;
-	virtual bool tick() = 0;
-	virtual void clear(LedMatrixColor &color) = 0;
-	virtual void clear() = 0;
-	virtual uint16_t* operator [](int index) = 0;
-	virtual void fillRow(uint16_t row, LedMatrixColor &color) = 0;
-	virtual void init() = 0;
-};
 
-template <unsigned int R, unsigned int C, unsigned int LEVELS>
-class LedMatrixFrameBuffer : public AbstractLedMatrixFrameBuffer
+//template <unsigned int R, unsigned int C, unsigned int LEVELS>
+template <typename CONFIG>
+class LedMatrixFrameBuffer
 {
 public:
+	static const uint16_t R = CONFIG::Rows;
+	static const uint16_t C = CONFIG::Cols;
+	static const uint16_t LEVELS = CONFIG::Levels;
 	LedMatrixFrameBuffer() {
 		currentRow = 0;
 		currentIntensity = 0;
 	}
 
 	void init() {
+		CONFIG::GPIOColOutput::ConfigureDirection(MCU::GPIO::Output);
+		CONFIG::GPIOColLatch::ConfigureDirection(MCU::GPIO::Output);
+		CONFIG::GPIOColClock::ConfigureDirection(MCU::GPIO::Output);
+
+		CONFIG::GPIORowLatch::ConfigureDirection(MCU::GPIO::Output);
+		CONFIG::GPIORowClock::ConfigureDirection(MCU::GPIO::Output);
+		CONFIG::GPIORowOutput::ConfigureDirection(MCU::GPIO::Output);
+		CONFIG::GPIORowEnable::ConfigureDirection(MCU::GPIO::Output);
+
 		rowReset();
 	}
 
-	uint16_t getRowCount() {
+	void reset() {
+		currentRow = 0;
+		currentIntensity = 0;
+		rowReset();
+	}
+
+	static inline const uint16_t getRowCount() {
 		return R;
 	}
 
-	uint16_t getColCount() {
+	static inline const uint16_t getColCount() {
 		return C;
+	}
+
+	inline const uint16_t getLevels() const {
+		return LEVELS;
 	}
 
 	void setChar(char c, LedMatrixColor &color, LedMatrixFont &font) {
@@ -93,7 +111,7 @@ public:
 	}
 
 	bool tick() {
-		//FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, ROW_ENABLE_PIN);
+		CONFIG::GPIORowEnable::Write(1);
 
 		if( currentIntensity > (LEVELS-1) ) {
 			currentIntensity = 0;
@@ -111,36 +129,17 @@ public:
 
 		const uint16_t *dots = fb[currentRow];
 
-		for(uint16_t r=0; r<C/8; r++) {
-			shiftOut(dots+r*8, 0, currentIntensity);
-		}
-
-		for(uint16_t r=0; r<C/8; r++) {
-			shiftOut(dots+r*8, 8, currentIntensity);
+		for(uint8_t disp=0; disp<C/8; disp+=2) {
+			shiftOut(dots+(disp+0)*8, 0, currentIntensity);
+			shiftOut(dots+(disp+1)*8, 0, currentIntensity);
+			shiftOut(dots+(disp+0)*8, 8, currentIntensity);
+			shiftOut(dots+(disp+1)*8, 8, currentIntensity);
 		}
 
 
 		colLatch();
 
-		/*if( currentRow == 0 ) {
-			rowFirstTick();
-		} else {
-			rowTick();
-		}
-
-		rowLatch();
-		colLatch();
-
-		currentRow++;
-		if( currentRow >= R ) {
-			currentIntensity++;
-			currentRow = 0;
-
-			if( currentIntensity > (33-1) ) {
-				currentIntensity = 0;
-			}
-		}*/
-		//FAST_GPIOPinWrite(ROW_ENABLE_PORT, ROW_ENABLE_PIN, 0);
+		CONFIG::GPIORowEnable::Write(0);
 		if( currentRow == R-1 && currentIntensity == (LEVELS-1)) {
 			return true;
 		} else {
@@ -167,16 +166,39 @@ public:
 		}
 	}
 
-	uint16_t* operator [](int index) {
-		return (uint16_t*)fb[index];
+	inline void putPixel(uint16_t x, uint16_t y, LedMatrixColor &color) {
+		fb[y][x] = color.getValue();
 	}
 
+	inline void putPixel(uint16_t x, uint16_t y, uint16_t color) {
+		fb[y][x] = color;
+	}
+
+	inline void putPixelDirect(uint16_t x, uint16_t y, uint16_t color) {
+		if( x < C && y < R ) {
+			fb[y][x] = color;
+		}
+	}
+
+	inline uint16_t getPixel(uint16_t x, uint16_t y) {
+		return fb[y][x];
+	}
+
+
 private:
-	inline void shiftOut(const uint16_t b[8], uint8_t shift, uint8_t threshold) {
+	void shiftOut(const uint16_t b[8], uint8_t shift, uint8_t threshold) {
 		uint16_t mask = 0xFF << shift;
 		uint16_t mt = threshold << shift;
 		for(unsigned int i=0;i<8; i++) {
-			//if( ((b[8-1-i] >> shift) & 0xFF) > threshold) {
+#ifdef NEW_GPIO
+			if( (b[8-1-i] & mask) > mt) {
+				CONFIG::GPIOColOutput::Write(1);
+			} else {
+				CONFIG::GPIOColOutput::Write(0);
+			}
+			CONFIG::GPIOColClock::Write(1);
+			CONFIG::GPIOColClock::Write(0);
+#else
 			if( (b[8-1-i] & mask) > mt) {
 				FAST_GPIOPinWrite(SER_OUT_PORT, SER_OUT_PIN, SER_OUT_PIN);
 			} else {
@@ -184,41 +206,69 @@ private:
 			}
 			FAST_GPIOPinWrite(CLK_OUT_PORT, CLK_OUT_PIN, CLK_OUT_PIN);
 			FAST_GPIOPinWrite(CLK_OUT_PORT, CLK_OUT_PIN, 0);
+#endif
 		}
 	}
 
 	void rowReset(void) {
 		for(unsigned int i=0; i<R; i++) {
+#ifdef NEW_GPIO
+			CONFIG::GPIORowOutput::Write(1);
+			CONFIG::GPIORowClock::Write(1);
+			CONFIG::GPIORowClock::Write(0);
+#else
 			FAST_GPIOPinWrite(ROW_SER_OUT_PORT, ROW_SER_OUT_PIN, ROW_SER_OUT_PIN);
 
 			FAST_GPIOPinWrite(ROW_CLK_OUT_PORT, ROW_CLK_OUT_PIN, ROW_CLK_OUT_PIN);
 			FAST_GPIOPinWrite(ROW_CLK_OUT_PORT, ROW_CLK_OUT_PIN, 0);
+#endif
 		}
 	}
 
 	void rowTick(void) {
+#ifdef NEW_GPIO
+		CONFIG::GPIORowOutput::Write(1);
+		CONFIG::GPIORowClock::Write(1);
+		CONFIG::GPIORowClock::Write(0);
+#else
 		FAST_GPIOPinWrite(ROW_SER_OUT_PORT, ROW_SER_OUT_PIN, ROW_SER_OUT_PIN);
 
 		FAST_GPIOPinWrite(ROW_CLK_OUT_PORT, ROW_CLK_OUT_PIN, ROW_CLK_OUT_PIN);
 		FAST_GPIOPinWrite(ROW_CLK_OUT_PORT, ROW_CLK_OUT_PIN, 0);
+#endif
 	}
 
 	void rowFirstTick(void) {
+#ifdef NEW_GPIO
+		CONFIG::GPIORowOutput::Write(0);
+		CONFIG::GPIORowClock::Write(1);
+		CONFIG::GPIORowClock::Write(0);
+#else
 		FAST_GPIOPinWrite(ROW_SER_OUT_PORT, ROW_SER_OUT_PIN, 0);
-
 		FAST_GPIOPinWrite(ROW_CLK_OUT_PORT, ROW_CLK_OUT_PIN, ROW_CLK_OUT_PIN);
 		FAST_GPIOPinWrite(ROW_CLK_OUT_PORT, ROW_CLK_OUT_PIN, 0);
+#endif
 	}
 
 	void rowLatch(void)
 	{
+#ifdef NEW_GPIO
+		CONFIG::GPIORowLatch::Write(1);
+		CONFIG::GPIORowLatch::Write(0);
+#else
 		FAST_GPIOPinWrite(ROW_LATCH_PORT, ROW_LATCH_PIN, ROW_LATCH_PIN);
 		FAST_GPIOPinWrite(ROW_LATCH_PORT, ROW_LATCH_PIN, 0);
+#endif
 	}
 
 	void colLatch(void) {
+#ifdef NEW_GPIO
+		CONFIG::GPIOColLatch::Write(1);
+		CONFIG::GPIOColLatch::Write(0);
+#else
 		FAST_GPIOPinWrite(LATCH_PORT, LATCH_PIN, LATCH_PIN);
 		FAST_GPIOPinWrite(LATCH_PORT, LATCH_PIN, 0);
+#endif
 	}
 
 private:
@@ -229,14 +279,17 @@ public:
 	uint16_t	fb[R][C]; // Holds actual framebuffer data
 };
 
+
+template<class FbType>
 class LedMatrixAnimation
 {
 public:
 	virtual void reset() = 0;
-	virtual bool update(AbstractLedMatrixFrameBuffer &fb) = 0;
+	virtual bool update(FbType &fb) = 0;
 };
 
-class LedMatrixScrollAnimation : public LedMatrixAnimation
+template<class FbType>
+class LedMatrixScrollAnimation : public LedMatrixAnimation<FbType>
 {
 public:
 	LedMatrixScrollAnimation(LedMatrixFont &font) 
@@ -251,17 +304,19 @@ public:
 		charEnd = font.getEnd(msgBuffer[nextChar]);
 	}
 
-	bool update(AbstractLedMatrixFrameBuffer &fb) {
+	bool update(FbType &fb) {
 		bool restarted = false;
 		uint16_t start = fb.getRowCount()/2-4;
 		for(uint16_t i=0; i<8; i++) {
 			for(uint16_t l=0; l<fb.getColCount()-1; l++) {
-				fb[start+i][l] = fb[start+i][l+1];
+				fb.putPixel(l, start+i, fb.getPixel(l+1, start+i));
 			}
 			if( nextChar < msgLen ) {
-				fb[start+i][fb.getColCount()-1] = ((font.getFontData()[msgBuffer[nextChar]-32][i] >> (7-offset)) & 0x1) * currentColor.getValue();
+				fb.putPixel(fb.getColCount()-1, start+i, ((font.getFontData()[msgBuffer[nextChar]-32][i] >> (7-offset)) & 0x1) * currentColor.getValue());
+				//fb[start+i][fb.getColCount()-1] = ((font.getFontData()[msgBuffer[nextChar]-32][i] >> (7-offset)) & 0x1) * currentColor.getValue();
 			} else {
-				fb[start+i][fb.getColCount()-1] = 0;
+				fb.putPixel(fb.getColCount()-1, start+i, 0);
+				//fb[start+i][fb.getColCount()-1] = 0;
 			}
 		}
 		offset++;
@@ -300,6 +355,7 @@ public:
 		msgLen += len;
 	}
 
+
 private:
 	void parseColor() {
 		if( msgBuffer[nextChar] == '#' ) {
@@ -333,16 +389,21 @@ private:
 
 
 
+template<class FbType>
 class LedMatrix
 {
 public:
-	LedMatrix(AbstractLedMatrixFrameBuffer &fb, LedMatrixFont &font) 
-		: defaultFont(font), frameBuffer(fb), animation((LedMatrixAnimation*)NULL)
+	LedMatrix(FbType &fb, LedMatrixFont &font) 
+		: defaultFont(font), frameBuffer(&fb), animation((LedMatrixAnimation<FbType>*)NULL)
 	{
 	}
 
+	void init() {
+		frameBuffer->init();
+	}
+
 	inline void setChar(char c, LedMatrixColor &color) {
-		frameBuffer.setChar(c, color, defaultFont);
+		frameBuffer->setChar(c, color, defaultFont);
 	}
 
         void putChar(char c, LedMatrixColor &color, unsigned int startX, unsigned int startY) {
@@ -368,11 +429,23 @@ public:
 	}
 
 	void clear(LedMatrixColor &color) {
-		frameBuffer.clear(color);
+		frameBuffer->clear(color);
+	}
+
+	inline void fillRect(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, LedMatrixColor &color) {
+		for(uint16_t x = x1; x <= x2; x++) {
+			for(uint16_t y = y1; y <= y2; y++) {
+				frameBuffer->putPixel(x, y, color);
+			}
+		}
 	}
 
 	bool update() {
-		bool frameDone = frameBuffer.tick();
+		bool frameDone = frameBuffer->tick();
+		if( frameDone && nextFrameBuffer ) {
+			frameBuffer = nextFrameBuffer;
+			nextFrameBuffer = (FbType*)NULL;
+		}
 		if( frameDone && animation != NULL ) {
 			animCountdown--;
 			if( animCountdown == 0 ) {
@@ -385,11 +458,11 @@ public:
 
 	void animTick() {
 		if( animation != NULL ) {
-			animation->update(frameBuffer);
+			animation->update(*frameBuffer);
 		}
 	}
 
-	void setAnimation(LedMatrixAnimation *animation, uint8_t interval) {
+	void setAnimation(LedMatrixAnimation<FbType> *animation, uint8_t interval) {
 		animInterval = interval;
 		if( animInterval == 0 ) {
 			animInterval = 1;
@@ -408,14 +481,23 @@ public:
 
 	uint8_t getAnimationInterval();
 
-	AbstractLedMatrixFrameBuffer &getFrameBuffer() {
-		return frameBuffer;
+	FbType &getFrameBuffer() {
+		return *frameBuffer;
+	}
+
+	void clearAnimation() {
+		animation = (LedMatrixAnimation<FbType>*)NULL;
+	}
+
+	void changeFrameBuffer(FbType *fb) {
+		nextFrameBuffer = fb;
 	}
 
 private:
 	LedMatrixFont 			&defaultFont;
-	AbstractLedMatrixFrameBuffer	&frameBuffer; 
-	LedMatrixAnimation		*animation;
+	FbType	*frameBuffer; 
+	FbType	*nextFrameBuffer; 
+	LedMatrixAnimation<FbType>		*animation;
 	uint8_t				animInterval;
 	uint8_t				animCountdown;
 

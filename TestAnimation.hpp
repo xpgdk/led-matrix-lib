@@ -3,16 +3,17 @@
 
 #include "LedMatrix.hpp"
 
-class LedMatrixTestAnimation : public LedMatrixAnimation {
+template<class FbType>
+class LedMatrixTestAnimation : public LedMatrixAnimation<FbType> {
 public:
-	LedMatrixTestAnimation(LedMatrix &matrix, LedMatrixAnimation &anim1)
+	LedMatrixTestAnimation(LedMatrix<FbType> &matrix, LedMatrixAnimation<FbType> &anim1)
 		: matrix(matrix), animation1(anim1),
 	 	  mode(CLEAR),
 		  yellow(15, 32,0) {
 			  matrix.setAnimationInterval(1);
 	}
 
-	bool update(AbstractLedMatrixFrameBuffer &fb) {
+	bool update(FbType &fb) {
 		bool done = false;
 		switch(mode) {
 			case CLEAR:
@@ -38,7 +39,7 @@ public:
 				}
 			break;
 			case FILL:
-				fb[fillY][fillX] = yellow.getValue();
+				fb.putPixel(fillX,fillY, yellow);
 				fillX++;
 				if( fillX >= fb.getColCount() ) {
 					fillX = 0;
@@ -92,8 +93,8 @@ public:
 private:
 	enum Mode {CLEAR, ANIM1, FILL, SCAN};
 
-	LedMatrix		&matrix;
-	LedMatrixAnimation	&animation1;
+	LedMatrix<FbType>		&matrix;
+	LedMatrixAnimation<FbType>	&animation1;
 	Mode		   	mode;
 	int		   	counter;
 	int			fillX, fillY;
